@@ -147,6 +147,8 @@ class EditorPlayState extends MusicBeatSubstate
 		RecalculateRating();
 	}
 
+	var prevMusicTime:Float = 0;
+
 	override function update(elapsed:Float)
 	{
 		if(controls.BACK || FlxG.keys.justPressed.ESCAPE)
@@ -162,7 +164,18 @@ class EditorPlayState extends MusicBeatSubstate
 			Conductor.songPosition = startPos - timerToStart;
 			if(timerToStart < 0) startSong();
 		}
-		else Conductor.songPosition += elapsed * 1000 * playbackRate;
+		else
+		{
+			if (FlxG.sound.music.time == prevMusicTime)
+			{
+				Conductor.songPosition += elapsed * 1000 * playbackRate;
+			}
+			else
+			{
+				Conductor.songPosition = FlxG.sound.music.time;
+				prevMusicTime = Conductor.songPosition;
+			}
+		}
 
 		if (unspawnNotes[0] != null)
 		{
@@ -220,11 +233,8 @@ class EditorPlayState extends MusicBeatSubstate
 	{
 		if (FlxG.sound.music.time >= -ClientPrefs.data.noteOffset)
 		{
-			if (Math.abs(FlxG.sound.music.time - (Conductor.songPosition - Conductor.offset)) > (20 * playbackRate)
-				|| (PlayState.SONG.needsVoices && Math.abs(vocals.time - (Conductor.songPosition - Conductor.offset)) > (20 * playbackRate)))
-			{
+			if (Conductor.songPosition <= vocals.length && Math.abs(vocals.time - FlxG.sound.music.time) > 15)
 				resyncVocals();
-			}
 		}
 		super.stepHit();
 
@@ -661,10 +671,6 @@ class EditorPlayState extends MusicBeatSubstate
 	{
 		if(key < 0) return;
 
-		// more accurate hit time for the ratings?
-		var lastTime:Float = Conductor.songPosition;
-		if(Conductor.songPosition >= 0) Conductor.songPosition = FlxG.sound.music.time;
-
 		// obtain notes that the player can hit
 		var plrInputNotes:Array<Note> = notes.members.filter(function(n:Note)
 			return n != null && n.canBeHit && n.mustPress && !n.tooLate &&
@@ -695,9 +701,6 @@ class EditorPlayState extends MusicBeatSubstate
 
 			goodNoteHit(funnyNote);
 		}
-
-		//more accurate hit time for the ratings? part 2 (Now that the calculations are done, go back to the time it was before for not causing a note stutter)
-		Conductor.songPosition = lastTime;
 
 		var spr:StrumNote = playerStrums.members[key];
 		if(spr != null && spr.animation.curAnim.name != 'confirm')
@@ -900,10 +903,9 @@ class EditorPlayState extends MusicBeatSubstate
 
 		FlxG.sound.music.play();
 		#if FLX_PITCH FlxG.sound.music.pitch = playbackRate; #end
-		Conductor.songPosition = FlxG.sound.music.time;
-		if (Conductor.songPosition <= vocals.length)
+		if (FlxG.sound.music.time <= vocals.length)
 		{
-			vocals.time = Conductor.songPosition;
+			vocals.time = FlxG.sound.music.time;
 			#if FLX_PITCH vocals.pitch = playbackRate; #end
 		}
 		vocals.play();
